@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcp-python-debugger"
+version = "0.1.0"
+description = "MCP server that gives Claude Code access to Python's debugpy debugger"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp[cli]>=1.0.0",
+    "debugpy>=1.8.0",
+    "pydantic>=2.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_debugger"]
+
+[project.scripts]
+mcp-python-debugger = "mcp_debugger.server:main"
