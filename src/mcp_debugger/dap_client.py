@@ -173,6 +173,11 @@ class DebugSession:
             self._listener_task.cancel()
         if self.process:
             self.process.terminate()
+            try:
+                await asyncio.wait_for(self.process.wait(), timeout=5.0)
+            except asyncio.TimeoutError:
+                self.process.kill()
+                await self.process.wait()
 
     # ---- breakpoints ----
 
