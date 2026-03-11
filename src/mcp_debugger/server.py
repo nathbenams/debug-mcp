@@ -33,6 +33,7 @@ from mcp_debugger.dap_client import DebugSession
 # ---------------------------------------------------------------------------
 
 _session: Optional[DebugSession] = None
+_session_lock = asyncio.Lock()
 
 
 def _find_free_port() -> int:
@@ -133,40 +134,41 @@ async def debug_launch(params: LaunchInput) -> str:
     """
     global _session
 
-    if _session is not None:
-        return "Error: A debug session is already active. Use debug_stop first."
+    async with _session_lock:
+        if _session is not None:
+            return "Error: A debug session is already active. Use debug_stop first."
 
-    program = os.path.abspath(params.program)
-    if not os.path.isfile(program):
-        return f"Error: File not found: {program}"
+        program = os.path.abspath(params.program)
+        if not os.path.isfile(program):
+            return f"Error: File not found: {program}"
 
-    cwd = params.cwd or str(Path(program).parent)
-    port = _find_free_port()
+        cwd = params.cwd or str(Path(program).parent)
+        port = _find_free_port()
 
-    try:
-        process = await _launch_debugpy(program, params.args, cwd, port)
-        reader, writer = await _connect_dap(port)
+        try:
+            process = await _launch_debugpy(program, params.args, cwd, port)
+            reader, writer = await _connect_dap(port)
 
-        session = DebugSession(reader=reader, writer=writer, process=process)
-        await session.initialize()
+            session = DebugSession(reader=reader, writer=writer, process=process)
+            await session.initialize()
 
-        await session.launch(program, params.args, cwd, stop_on_entry=params.stop_on_entry)
+            await session.launch(program, params.args, cwd, stop_on_entry=params.stop_on_entry)
 
-        if params.stop_on_entry:
-            await session.wait_for_stop(timeout=10.0)
+            if params.stop_on_entry:
+                await session.wait_for_stop(timeout=10.0)
 
-        _session = session
-        return (
-            f"Debug session started.\n"
-            f"  Program: {program}\n"
-            f"  PID: {process.pid}\n"
-            f"  DAP port: {port}\n"
-            f"  Paused: {'yes (on entry)' if params.stop_on_entry else 'no — running'}\n\n"
-            f"Next steps: set breakpoints with debug_set_breakpoints, "
-            f"then debug_continue to run."
-        )
-    except Exception as e:
-        return f"Error launching debugger: {e}"
+            _session = session
+            return (
+                f"Debug session started.\n"
+                f"  Program: {program}\n"
+                f"  PID: {process.pid}\n"
+                f"  DAP port: {port}\n"
+                f"  Paused: {'yes (on entry)' if params.stop_on_entry else 'no — running'}\n\n"
+                f"Next steps: set breakpoints with debug_set_breakpoints, "
+                f"then debug_continue to run."
+            )
+        except Exception as e:
+            return f"Error launching debugger: {e}"
 
 
 @mcp.tool(
@@ -186,14 +188,15 @@ async def debug_stop() -> str:
         str: Confirmation or error if no session is active.
     """
     global _session
-    if _session is None:
-        return "No active debug session."
-    try:
-        await _session.disconnect()
-    except Exception:
-        pass
-    _session = None
-    return "Debug session terminated."
+    async with _session_lock:
+        if _session is None:
+            return "No active debug session."
+        try:
+            await _session.disconnect()
+        except Exception:
+            pass
+        _session = None
+        return "Debug session terminated."
 
 
 # ---- Breakpoints ----
