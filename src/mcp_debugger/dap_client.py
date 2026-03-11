@@ -32,9 +32,15 @@ async def _read_dap_message(reader: asyncio.StreamReader) -> dict:
         if line == b"\r\n" or line == b"\n":
             break
         if line.lower().startswith(b"content-length:"):
-            content_length = int(line.split(b":")[1].strip())
+            try:
+                content_length = int(line.split(b":")[1].strip())
+            except (ValueError, IndexError) as e:
+                raise RuntimeError(f"Malformed DAP header: {line!r}") from e
     body = await reader.readexactly(content_length)
-    return json.loads(body)
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"Malformed DAP body ({len(body)} bytes): {e}") from e
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +116,7 @@ class DebugSession:
                         self._stopped_event.set()
                         break
 
-        except (asyncio.IncompleteReadError, ConnectionResetError):
+        except (asyncio.IncompleteReadError, ConnectionResetError, RuntimeError):
             pass
         finally:
             self._cancel_pending_futures("listener ended")
