@@ -7,6 +7,7 @@ launch, breakpoints, stepping, variable inspection, expression evaluation.
 
 import asyncio
 import json
+from collections import deque
 from typing import Any, Optional
 from dataclasses import dataclass, field
 
@@ -50,7 +51,7 @@ class DebugSession:
 
     _seq: int = 1
     _pending: dict[int, asyncio.Future] = field(default_factory=dict)
-    _events: list[dict] = field(default_factory=list)
+    _events: deque[dict] = field(default_factory=lambda: deque(maxlen=100))
     _stopped_event: Optional[asyncio.Event] = field(default=None)
     _listener_task: Optional[asyncio.Task] = None
     _initialized: bool = False
