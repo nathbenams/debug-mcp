@@ -522,7 +522,7 @@ async def debug_status() -> str:
             lines.append(f"  Process: exited (code {rc})")
 
     # Show last few events
-    recent = _session._events[-5:]
+    recent = _session.recent_events(5)
     if recent:
         lines.append("\n  Recent events:")
         for ev in recent:

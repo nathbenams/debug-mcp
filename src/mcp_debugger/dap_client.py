@@ -261,6 +261,10 @@ class DebugSession:
             "context": context,
         })
 
+    def recent_events(self, n: int = 5) -> list[dict]:
+        """Return the *n* most recent DAP events."""
+        return list(self._events)[-n:]
+
     # ---- internal helpers ----
 
     def _cancel_pending_futures(self, reason: str):
